@@ -1,0 +1,10 @@
+allowBuilds:
+  electron: true
+  esbuild: true
+minimumReleaseAgeExclude:
+  - '@thmxsweb/jj-sdk@0.4.0'
+# pnpm build allowlist. Electron downloads its binary in a postinstall; esbuild
+# builds a native helper for Vite/electron-vite.
+onlyBuiltDependencies:
+  - electron
+  - esbuild

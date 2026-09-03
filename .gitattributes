@@ -1,0 +1,4 @@
+# Normalize line endings to LF so Prettier and CI agree across platforms.
+* text=auto eol=lf
+
+pnpm-lock.yaml -diff
