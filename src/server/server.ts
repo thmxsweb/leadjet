@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { loadConfig } from '../core/config.js';
+import { isConfigKey, loadConfig, saveConfig, setConfigValue } from '../core/config.js';
 import { placesQuery, type Location } from '../core/location.js';
 import { runPipeline, type EnrichedLead } from '../core/pipeline.js';
 import { ProxyRotator } from '../core/proxy.js';
@@ -44,8 +44,58 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     await search(req, res);
     return;
   }
+  if (req.method === 'GET' && url === '/api/config') {
+    getConfig(res);
+    return;
+  }
+  if (req.method === 'POST' && url === '/api/config') {
+    await postConfig(req, res);
+    return;
+  }
   res.writeHead(404, { 'content-type': 'text/plain' });
   res.end('not found');
+}
+
+/** Report which settings are present (never leaks the raw key). */
+function getConfig(res: ServerResponse): void {
+  const c = loadConfig();
+  json(res, 200, {
+    hasPlacesKey: Boolean(c.placesKey),
+    keyHint: c.placesKey ? `${c.placesKey.slice(0, 4)}…${c.placesKey.slice(-4)}` : '',
+    defaults: {
+      source: c.source ?? '',
+      country: c.country ?? '',
+      region: c.region ?? '',
+      city: c.city ?? '',
+      language: c.language ?? '',
+    },
+  });
+}
+
+/** Save settings from the dashboard (Places key, default location, etc.). */
+async function postConfig(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = (await readBody(req)) as Record<string, string>;
+  let config = loadConfig();
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value !== 'string') continue;
+    if (key === 'places-key' && value.trim() === '') {
+      const { placesKey: _drop, ...rest } = config;
+      config = rest;
+      continue;
+    }
+    if (isConfigKey(key)) config = setConfigValue(config, key, value);
+  }
+  try {
+    saveConfig(config);
+    getConfig(res);
+  } catch (err) {
+    json(res, 500, { error: err instanceof Error ? err.message : String(err) });
+  }
+}
+
+function json(res: ServerResponse, status: number, obj: unknown): void {
+  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify(obj));
 }
 
 async function search(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -105,6 +155,10 @@ async function search(req: IncomingMessage, res: ServerResponse): Promise<void> 
 }
 
 function readJson(req: IncomingMessage): Promise<SearchBody> {
+  return readBody(req) as Promise<SearchBody>;
+}
+
+function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((resolve) => {
     let raw = '';
     req.on('data', (c) => {
@@ -113,7 +167,7 @@ function readJson(req: IncomingMessage): Promise<SearchBody> {
     });
     req.on('end', () => {
       try {
-        resolve(raw ? (JSON.parse(raw) as SearchBody) : {});
+        resolve(raw ? (JSON.parse(raw) as Record<string, unknown>) : {});
       } catch {
         resolve({});
       }

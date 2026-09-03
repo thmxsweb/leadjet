@@ -36,6 +36,7 @@ export interface EnrichedLead {
   confidence: string;
   source: string;
   maps: string;
+  place_id: string;
 }
 
 export interface PipelineOptions {
@@ -185,5 +186,6 @@ async function enrichOne(raw: RawLead, opts: PipelineOptions): Promise<EnrichedL
     confidence: owner.confidence,
     source: raw.source,
     maps: str(raw.maps),
+    place_id: str(raw.place_id),
   };
 }
