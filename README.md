@@ -50,12 +50,12 @@ If you don't pass `--source`, leadjet uses `places` when a key is set, otherwise
 | `-l, --limit <n>`     | Max leads (paginates 20 at a time, up to 200). Default `20`.                                           |
 | `-o, --out <file>`    | Write to a file instead of stdout. Format is inferred from the extension.                              |
 | `--format <fmt>`      | `json` (default), `csv`, or `ndjson`.                                                                  |
-| `--country <name>`    | Target country by name or ISO code, e.g. `Canada`, `CA`, `France`.                                    |
-| `--region <name>`     | Target region / state / province, e.g. `Quebec`, `QC`, `Île-de-France`.                               |
-| `--city <name>`       | Target city, e.g. `Montreal`, `Paris`, `Lyon`.                                                        |
+| `--country <name>`    | Target country by name or ISO code, e.g. `Canada`, `CA`, `France`.                                     |
+| `--region <name>`     | Target region / state / province, e.g. `Quebec`, `QC`, `Île-de-France`.                                |
+| `--city <name>`       | Target city, e.g. `Montreal`, `Paris`, `Lyon`.                                                         |
 | `--category <cat>`    | OSM only: `any`, `shops`, `food`, `craft`, `services`, `beauty`.                                       |
 | `--language <code>`   | Language code, e.g. `fr`, `en`.                                                                        |
-| `--key <key>`         | Use this API key instead of the saved one (Places).                                                   |
+| `--key <key>`         | Use this API key instead of the saved one (Places).                                                    |
 
 #### Targeting a location
 
@@ -120,6 +120,38 @@ leadjet find "cafes in Nice"     # uses the saved proxies automatically
 
 Precedence: `--proxy` › `--proxies-file` › saved `proxies`. Credentials are
 masked whenever the config is printed.
+
+### `leadjet contacts`
+
+Turn a leads dataset into a **contact list**. For each lead that has a website,
+leadjet visits the site (plus its contact / about / team pages) and pulls out the
+**emails, phones, social profiles, and — when the site exposes it — the owner /
+founder name** (from JSON-LD or author metadata). It's free: no key, just the
+public web.
+
+| Option                  | Description                                                        |
+| ----------------------- | ----------------------------------------------------------------- |
+| `-i, --in <file>`       | Leads dataset to enrich (`json` or `ndjson`). **Required.**        |
+| `-o, --out <file>`      | Write to a file (overwrites); format inferred from the extension. |
+| `-a, --append <file>`   | Append to a contacts file, de-duplicated.                         |
+| `--format <fmt>`        | `json`, `csv`, or `ndjson`.                                        |
+| `-c, --concurrency <n>` | How many sites to scrape at once (default `6`).                   |
+| `--pages <n>`           | Extra contact/about/team pages to scan per site (default `3`).    |
+| `--timeout <ms>`        | Per-request timeout (default `12000`).                            |
+| `--proxy` / `--proxies-file` | Route scraping through proxies (same as `find`).             |
+
+```bash
+# 1. Build a lead list.
+leadjet find "restaurants" --source osm --city Lyon --country FR -o leads.ndjson
+
+# 2. Enrich it into contacts (emails, phones, socials, owner).
+leadjet contacts --in leads.ndjson -o contacts.csv
+```
+
+Output columns: `name, owner, email, emails, phone, website, facebook,
+instagram, linkedin, twitter, youtube`. `email` is the single best guess (named
+addresses rank above `info@`, which ranks above `no-reply@`); `emails` keeps them
+all. Emails from booking/hosting widgets (OVH, Zenchef, Wix …) are filtered out.
 
 ### `leadjet fields`
 

@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { registerConfigCommand } from './commands/config-cmd.js';
+import { registerContactsCommand } from './commands/contacts-cmd.js';
 import { registerFieldsCommand } from './commands/fields-cmd.js';
 import { registerFindCommand } from './commands/find-cmd.js';
 import { VERSION } from './version.js';
@@ -13,6 +14,7 @@ program
   .showHelpAfterError();
 
 registerFindCommand(program);
+registerContactsCommand(program);
 registerFieldsCommand(program);
 registerConfigCommand(program);
 
