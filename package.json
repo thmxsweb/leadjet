@@ -47,6 +47,7 @@
     "prepack": "pnpm run build"
   },
   "dependencies": {
+    "@thmxsweb/jj-sdk": "^0.4.0",
     "commander": "^12.1.0",
     "picocolors": "^1.1.1",
     "undici": "^6.21.0"

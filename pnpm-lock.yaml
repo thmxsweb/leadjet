@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@thmxsweb/jj-sdk':
+        specifier: ^0.4.0
+        version: 0.4.0
       commander:
         specifier: ^12.1.0
         version: 12.1.0
@@ -626,6 +629,10 @@ packages:
     resolution: {integrity: sha512-at8QVep6S3h5Y6gSbdGU06bRY5WJkf6WUduM9YtvYMbYhB1MOFfUgc6kehitQXzOtMSaT70q7f9ydPhpqu821w==}
     cpu: [x64]
     os: [win32]
+
+  '@thmxsweb/jj-sdk@0.4.0':
+    resolution: {integrity: sha512-need2YL/KQvx8Q1VRZUPoqUtjdnDKuzlWYY85NoOBlGJNo8ewz/ZjvTn5+hPn2Bn3lFbLBqT0SX0CKQTAoR7eA==}
+    engines: {node: '>=18.17'}
 
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
@@ -2145,6 +2152,8 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.63.1':
     optional: true
+
+  '@thmxsweb/jj-sdk@0.4.0': {}
 
   '@types/chai@5.2.3':
     dependencies:
