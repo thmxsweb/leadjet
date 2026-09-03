@@ -41,6 +41,8 @@ export const LEAD_COLUMNS = [
   'priority',
   'opportunity',
   'approach',
+  'domain',
+  'domainType',
   'location',
   'regCity',
   'regCp',

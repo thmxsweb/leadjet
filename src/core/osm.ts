@@ -6,11 +6,12 @@ import type { RawLead } from './types.js';
 
 const NOMINATIM = 'https://nominatim.openstreetmap.org/search';
 
-/** Overpass mirrors, tried in order — the main instance rate-limits hard. */
+/** Overpass mirrors, tried in order — instances rate-limit (429) independently. */
 const OVERPASS_ENDPOINTS = [
-  'https://overpass.private.coffee/api/interpreter',
-  'https://overpass-api.de/api/interpreter',
   'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
 ];
 
 export interface OsmSearchOptions {

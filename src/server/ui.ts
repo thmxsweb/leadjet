@@ -236,7 +236,7 @@ function tel(p){return p?'<a class="mono" href="tel:'+String(p).replace(/\\s/g,"
 function mail(e){return e?'<a href="mailto:'+esc(e)+'">'+esc(e)+'</a>':'<span class="mut">\\u2014</span>'}
 function tier(s){return s>=70?"hot":s>=45?"warm":"cold"}
 function keyOf(r){return r.place_id||(r.name+"|"+r.location)}
-var COLS=["name","legal","activity","owner","role","phone","email","score","priority","opportunity","approach","location","regCity","regCp","website","siteStatus","naf","legalForm","created","size","siren","confidence","source"];
+var COLS=["name","legal","activity","owner","role","phone","email","score","priority","opportunity","approach","domain","domainType","location","regCity","regCp","website","siteStatus","naf","legalForm","created","size","siren","confidence","source"];
 
 /* ---- i18n ---- */
 var I18N={

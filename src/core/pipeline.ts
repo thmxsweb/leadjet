@@ -37,6 +37,10 @@ export interface EnrichedLead {
   source: string;
   maps: string;
   place_id: string;
+  /** Existing site domain (to remake) or a proposed domain if none. */
+  domain: string;
+  /** 'existing' when the business already has a site, else 'proposal'. */
+  domainType: string;
 }
 
 export interface PipelineOptions {
@@ -72,6 +76,31 @@ const PLACES_MASK = [
 ].join(',');
 
 const str = (v: Value): string => (v == null ? '' : String(v));
+
+function hostOf(url: string): string {
+  try {
+    return new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
+
+function slugify(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+}
+
+/** Propose a domain from the business name (.fr for French postal codes). */
+function proposeDomain(name: string, cp: string): string {
+  const s = slugify(name);
+  if (!s) return '';
+  return `${s}${/^\d{5}$/.test(cp) ? '.fr' : '.com'}`;
+}
 
 async function search(opts: PipelineOptions): Promise<RawLead[]> {
   if (opts.source === 'places') {
@@ -120,7 +149,7 @@ export async function runPipeline(opts: PipelineOptions): Promise<EnrichedLead[]
 async function enrichOne(raw: RawLead, opts: PipelineOptions): Promise<EnrichedLead> {
   const website = str(raw.website);
   let audit: SiteAudit | null = null;
-  if (opts.auditSites && website) audit = await auditSite(website, opts.proxies);
+  if (opts.auditSites && website) audit = await auditSite(website, opts.proxies, 7000);
 
   let owner = {
     owner: '',
@@ -187,5 +216,7 @@ async function enrichOne(raw: RawLead, opts: PipelineOptions): Promise<EnrichedL
     source: raw.source,
     maps: str(raw.maps),
     place_id: str(raw.place_id),
+    domain: website ? hostOf(website) : proposeDomain(str(raw.name), owner.regCp),
+    domainType: website ? 'existing' : 'proposal',
   };
 }
