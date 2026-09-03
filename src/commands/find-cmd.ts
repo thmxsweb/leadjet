@@ -1,8 +1,15 @@
-import { writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import type { Command } from 'commander';
 import { loadConfig, type ExportFormat } from '../core/config.js';
+import { mergeLeads, parseDataset, type DatasetFormat } from '../core/dataset.js';
 import { serialize } from '../core/export.js';
-import { buildFieldMask, DEFAULT_FIELDS, placeToLead, resolveFields } from '../core/fields.js';
+import {
+  buildFieldMask,
+  DEFAULT_FIELDS,
+  placeToLead,
+  resolveFields,
+  type FieldDef,
+} from '../core/fields.js';
 import { PlacesError, searchText } from '../core/places.js';
 import { log } from '../util/logger.js';
 
@@ -10,6 +17,7 @@ interface FindOptions {
   fields?: string;
   limit: string;
   out?: string;
+  append?: string;
   format?: string;
   region?: string;
   language?: string;
@@ -24,7 +32,8 @@ export function registerFindCommand(program: Command): void {
     .description('Find leads from Google Places and export them')
     .option('-f, --fields <list>', 'comma-separated fields to export (see "leadjet fields")')
     .option('-l, --limit <n>', 'maximum number of leads', '20')
-    .option('-o, --out <file>', 'write to a file instead of stdout')
+    .option('-o, --out <file>', 'write to a file (overwrites); format inferred from extension')
+    .option('-a, --append <file>', 'append to a dataset file, de-duplicated (json or ndjson)')
     .option('--format <fmt>', 'json | csv | ndjson')
     .option('--region <code>', 'ISO region code to bias results, e.g. FR, CA')
     .option('--language <code>', 'language code, e.g. fr, en')
@@ -33,7 +42,8 @@ export function registerFindCommand(program: Command): void {
       'after',
       '\nExamples:\n' +
         '  $ leadjet find "plumbers in Bordeaux" --fields name,phone,website --limit 40\n' +
-        '  $ leadjet find "hair salons in Montreal" -o leads.csv --format csv\n',
+        '  $ leadjet find "hair salons in Montreal" -o leads.csv\n' +
+        '  $ leadjet find "bakeries in Lyon" --append leads.ndjson   # grows a deduped dataset\n',
     )
     .action(async (queryParts: string[], options: FindOptions) => {
       const config = loadConfig();
@@ -46,7 +56,24 @@ export function registerFindCommand(program: Command): void {
         return;
       }
 
-      let defs;
+      const target = options.append ?? options.out;
+      const format = resolveFormat(
+        options.format ?? config.format,
+        target,
+        options.append ? 'ndjson' : 'json',
+      );
+      if (!format) {
+        log.error(`Invalid --format. Use one of: ${FORMATS.join(', ')}`);
+        process.exitCode = 1;
+        return;
+      }
+      if (options.append && format === 'csv') {
+        log.error('--append supports json or ndjson (CSV cannot be safely merged).');
+        process.exitCode = 1;
+        return;
+      }
+
+      let defs: FieldDef[];
       try {
         defs = resolveFields(
           options.fields ? options.fields.split(',') : (config.fields ?? DEFAULT_FIELDS),
@@ -56,16 +83,15 @@ export function registerFindCommand(program: Command): void {
         process.exitCode = 1;
         return;
       }
-
-      const format = resolveFormat(options.format ?? config.format, options.out);
-      if (!format) {
-        log.error(`Invalid --format. Use one of: ${FORMATS.join(', ')}`);
-        process.exitCode = 1;
-        return;
+      // A stable key is required to de-duplicate an appended dataset.
+      if (options.append && !defs.some((d) => d.name === 'place_id')) {
+        defs = [...defs, ...resolveFields(['place_id'])];
       }
 
       const limit = clampLimit(options.limit);
       const query = queryParts.join(' ');
+      const region = options.region ?? config.region;
+      const language = options.language ?? config.language;
 
       log.info(`Searching Google Places for ${log.bold(query)} …`);
       try {
@@ -74,25 +100,27 @@ export function registerFindCommand(program: Command): void {
           query,
           fieldMask: buildFieldMask(defs),
           limit,
-          ...((options.region ?? config.region) ? { region: options.region ?? config.region } : {}),
-          ...((options.language ?? config.language)
-            ? { language: options.language ?? config.language }
-            : {}),
+          ...(region ? { region } : {}),
+          ...(language ? { language } : {}),
         });
+        const found = places.map((p) => placeToLead(p, defs));
+        const columns = defs.map((d) => d.name);
 
-        const leads = places.map((p) => placeToLead(p, defs));
-        const output = serialize(
-          leads,
-          format,
-          defs.map((d) => d.name),
-        );
-
-        if (options.out) {
-          writeFileSync(options.out, `${output}\n`);
-          log.success(`Exported ${leads.length} lead(s) to ${log.bold(options.out)}.`);
+        if (options.append) {
+          const existing = existsSync(options.append)
+            ? parseDataset(readFileSync(options.append, 'utf8'), format as DatasetFormat)
+            : [];
+          const { merged, added } = mergeLeads(existing, found);
+          writeFileSync(options.append, `${serialize(merged, format, columns)}\n`);
+          log.success(
+            `Added ${added} new lead(s) — ${merged.length} total in ${log.bold(options.append)}.`,
+          );
+        } else if (options.out) {
+          writeFileSync(options.out, `${serialize(found, format, columns)}\n`);
+          log.success(`Exported ${found.length} lead(s) to ${log.bold(options.out)}.`);
         } else {
-          process.stdout.write(`${output}\n`);
-          log.success(`Found ${leads.length} lead(s).`);
+          process.stdout.write(`${serialize(found, format, columns)}\n`);
+          log.success(`Found ${found.length} lead(s).`);
         }
       } catch (err) {
         if (err instanceof PlacesError) {
@@ -108,16 +136,20 @@ export function registerFindCommand(program: Command): void {
     });
 }
 
-function resolveFormat(explicit: string | undefined, out: string | undefined): ExportFormat | null {
-  const candidate = explicit ?? inferFromExtension(out) ?? 'json';
+function resolveFormat(
+  explicit: string | undefined,
+  target: string | undefined,
+  fallback: ExportFormat,
+): ExportFormat | null {
+  const candidate = explicit ?? inferFromExtension(target) ?? fallback;
   return (FORMATS as string[]).includes(candidate) ? (candidate as ExportFormat) : null;
 }
 
-function inferFromExtension(out: string | undefined): ExportFormat | undefined {
-  if (!out) return undefined;
-  if (out.endsWith('.csv')) return 'csv';
-  if (out.endsWith('.ndjson')) return 'ndjson';
-  if (out.endsWith('.json')) return 'json';
+function inferFromExtension(target: string | undefined): ExportFormat | undefined {
+  if (!target) return undefined;
+  if (target.endsWith('.csv')) return 'csv';
+  if (target.endsWith('.ndjson')) return 'ndjson';
+  if (target.endsWith('.json')) return 'json';
   return undefined;
 }
 

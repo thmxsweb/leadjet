@@ -54,6 +54,24 @@ leadjet find "dentists in Austin" -o dentists.json
 
 Output goes to **stdout** so you can pipe it; progress and messages go to stderr.
 
+#### Building a lead dataset (`--append`)
+
+To grow one clean dataset across many searches, use `--append`. New leads are
+added and **duplicates are skipped** (by Google Place ID, falling back to
+name + address). `place_id` is included automatically so the dataset stays
+de-dupable. Append works with `json` or `ndjson` (NDJSON recommended).
+
+```bash
+leadjet find "bakeries in Lyon"     --append leads.ndjson
+leadjet find "cafes in Lyon"        --append leads.ndjson
+leadjet find "restaurants in Lyon"  --append leads.ndjson
+# → leads.ndjson keeps growing, no duplicates
+```
+
+**Which format?** For feeding another tool, **NDJSON** is best (append-friendly,
+streamable, one record per line — ideal for bulk DB import). **JSON** is best for
+a single programmatic import; **CSV** is best for spreadsheets and human review.
+
 ### `leadjet fields`
 
 List every field you can export (name, address, phone, website, rating, reviews, maps, type, status, lat, lng, place_id).
