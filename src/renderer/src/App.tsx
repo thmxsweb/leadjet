@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { Radar, KanbanSquare, Contact, Send } from 'lucide-react';
+import { Contact, Send } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import { Login } from './views/Login';
 import { Money } from './views/Money';
+import { Radar } from './views/Radar';
+import { Pipeline } from './views/Pipeline';
 import { Placeholder } from './views/Placeholder';
 import { useUi } from './store';
 
@@ -23,20 +25,8 @@ export function App(): JSX.Element {
       <Sidebar email={auth.data.user?.email} />
       <main className="flex-1 overflow-y-auto p-8">
         {view === 'money' && <Money />}
-        {view === 'radar' && (
-          <Placeholder
-            icon={Radar}
-            title="Radar"
-            description="Discover local businesses that need a website, scored by opportunity. Google Places, OpenStreetMap, and manual site audits."
-          />
-        )}
-        {view === 'pipeline' && (
-          <Placeholder
-            icon={KanbanSquare}
-            title="Pipeline"
-            description="Your deal board: New, Contacted, Proposal, Won. Drag leads through the stages and never lose a follow-up."
-          />
-        )}
+        {view === 'radar' && <Radar />}
+        {view === 'pipeline' && <Pipeline />}
         {view === 'contacts' && (
           <Placeholder
             icon={Contact}

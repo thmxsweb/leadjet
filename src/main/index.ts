@@ -1,9 +1,12 @@
 import { join } from 'node:path';
 import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron';
 import { IpcChannel } from '../shared/ipc.js';
+import type { Lead, LeadSearchInput, LeadStatus } from '../shared/lead.js';
 import { JumpService } from './jump-service.js';
+import { LeadService } from './leads/service.js';
 
 const jump = new JumpService();
+const leads = new LeadService();
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -38,6 +41,19 @@ function registerIpc(): void {
   );
   ipcMain.handle(IpcChannel.JumpLogout, () => jump.logout());
   ipcMain.handle(IpcChannel.JumpMoney, () => jump.money());
+
+  ipcMain.handle(IpcChannel.LeadsSearch, (_e, input: LeadSearchInput) => leads.search(input));
+  ipcMain.handle(IpcChannel.LeadsList, () => leads.list());
+  ipcMain.handle(IpcChannel.LeadsSave, (_e, lead: Lead) => leads.save(lead));
+  ipcMain.handle(IpcChannel.LeadsUpdateStatus, (_e, id: string, status: LeadStatus) =>
+    leads.updateStatus(id, status),
+  );
+  ipcMain.handle(IpcChannel.LeadsUpdate, (_e, id: string, patch: Partial<Lead>) =>
+    leads.update(id, patch),
+  );
+  ipcMain.handle(IpcChannel.LeadsRemove, (_e, id: string) => leads.remove(id));
+  ipcMain.handle(IpcChannel.LeadsAudit, (_e, url: string) => leads.audit(url));
+
   ipcMain.handle(IpcChannel.AppVersion, () => app.getVersion());
 }
 
