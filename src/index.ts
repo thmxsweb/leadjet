@@ -4,6 +4,7 @@ import { registerContactsCommand } from './commands/contacts-cmd.js';
 import { registerFieldsCommand } from './commands/fields-cmd.js';
 import { registerFindCommand } from './commands/find-cmd.js';
 import { registerLeadsCommand } from './commands/leads-cmd.js';
+import { registerLinkCommand } from './commands/link-cmd.js';
 import { registerServeCommand } from './commands/serve-cmd.js';
 import { VERSION } from './version.js';
 
@@ -16,6 +17,7 @@ program
   .showHelpAfterError();
 
 registerServeCommand(program);
+registerLinkCommand(program);
 registerLeadsCommand(program);
 registerFindCommand(program);
 registerContactsCommand(program);

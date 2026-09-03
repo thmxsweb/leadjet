@@ -24,6 +24,7 @@ const KEY_TO_PROP: Record<ConfigKey, keyof Config> = {
   proxies: 'proxies',
   'jump-email': 'jumpEmail',
   'jump-password': 'jumpPassword',
+  'web-url': 'webUrl',
 };
 
 export function registerConfigCommand(program: Command): void {

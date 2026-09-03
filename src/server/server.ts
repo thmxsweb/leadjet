@@ -31,6 +31,15 @@ export function startServer(port: number, host: string): Server {
 
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = req.url ?? '/';
+  // Allow a separate frontend (e.g. the Next.js app) to call this local API.
+  res.setHeader('access-control-allow-origin', '*');
+  res.setHeader('access-control-allow-methods', 'GET, POST, OPTIONS');
+  res.setHeader('access-control-allow-headers', 'content-type');
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
   if (req.method === 'GET' && (url === '/' || url === '/index.html')) {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
     res.end(PAGE);

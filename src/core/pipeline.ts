@@ -79,7 +79,10 @@ const str = (v: Value): string => (v == null ? '' : String(v));
 
 function hostOf(url: string): string {
   try {
-    return new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(/^www\./, '');
+    return new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(
+      /^www\./,
+      '',
+    );
   } catch {
     return '';
   }

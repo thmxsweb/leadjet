@@ -29,6 +29,12 @@ export interface Config {
   jumpPassword?: string;
   /** Stable per-install id used by the cvcrush integration. */
   appId?: string;
+  /** leadjet-web base URL (Vercel in prod, localhost in dev). */
+  webUrl?: string;
+  /** Device token linking this CLI to the web account (valid 7 days). */
+  linkToken?: string;
+  /** ISO expiry of the link token. */
+  linkTokenExpires?: string;
 }
 
 export type ExportFormat = 'json' | 'csv' | 'ndjson';
@@ -87,6 +93,7 @@ export const CONFIG_KEYS = [
   'proxies',
   'jump-email',
   'jump-password',
+  'web-url',
 ] as const;
 export type ConfigKey = (typeof CONFIG_KEYS)[number];
 
@@ -136,6 +143,9 @@ export function setConfigValue(config: Config, key: ConfigKey, value: string): C
     case 'jump-password':
       next.jumpPassword = value;
       break;
+    case 'web-url':
+      next.webUrl = value.trim().replace(/\/+$/, '');
+      break;
   }
   return next;
 }
@@ -155,6 +165,7 @@ export function redactConfig(config: Config): Record<string, unknown> {
     ...config,
     placesKey: config.placesKey ? maskKey(config.placesKey) : undefined,
     jumpPassword: config.jumpPassword ? '••••••••' : undefined,
+    linkToken: config.linkToken ? '••••••••' : undefined,
     proxies: config.proxies?.map(maskProxyCreds),
   };
 }

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import type { Command } from 'commander';
+import { DEFAULT_WEB_URL, pushLeads } from '../core/cli-link.js';
 import { loadConfig, type Config, type ExportFormat } from '../core/config.js';
 import { mergeLeads, parseDataset, type DatasetFormat } from '../core/dataset.js';
 import { serialize } from '../core/export.js';
@@ -20,6 +21,7 @@ interface LeadsOptions {
   out?: string;
   append?: string;
   format?: string;
+  push?: boolean;
   language?: string;
   key?: string;
   proxy?: string;
@@ -71,6 +73,7 @@ export function registerLeadsCommand(program: Command): void {
     .option('--no-audit', 'skip website audit')
     .option('-o, --out <file>', 'write to a file (overwrites); format inferred from extension')
     .option('-a, --append <file>', 'append to a dataset file, de-duplicated (json or ndjson)')
+    .option('--push', 'push the found leads to your linked leadjet-web account')
     .option('--format <fmt>', 'json | csv | ndjson')
     .option('--language <code>', 'language code, e.g. fr, en')
     .option('--key <key>', 'Google Places API key (overrides the saved one)')
@@ -143,7 +146,9 @@ export function registerLeadsCommand(program: Command): void {
           },
         });
         leads.sort((a, b) => b.score - a.score);
-        writeOut(leads, format, options);
+        if (options.push) await pushToAccount(leads, config);
+        if (options.out || options.append) writeOut(leads, format, options);
+        else if (!options.push) writeOut(leads, format, options);
       } catch (err) {
         log.error(err instanceof Error ? err.message : String(err));
         process.exitCode = 1;
@@ -171,6 +176,21 @@ function writeOut(leads: EnrichedLead[], format: ExportFormat, options: LeadsOpt
     const hot = leads.filter((l) => l.priority === 'Chaud').length;
     log.success(`${leads.length} lead(s) — ${hot} Chaud.`);
   }
+}
+
+async function pushToAccount(leads: EnrichedLead[], config: Config): Promise<void> {
+  if (!config.linkToken) {
+    log.error('Not linked. Run "leadjet link" first.');
+    return;
+  }
+  if (config.linkTokenExpires && new Date(config.linkTokenExpires).getTime() < Date.now()) {
+    log.error('Your link expired (7 days). Run "leadjet link" again.');
+    return;
+  }
+  const webUrl = (config.webUrl ?? DEFAULT_WEB_URL).replace(/\/+$/, '');
+  log.info(`Pushing ${leads.length} lead(s) to ${log.bold(webUrl)} …`);
+  const r = await pushLeads(webUrl, config.linkToken, leads);
+  log.success(`Pushed: ${r.added} new, ${r.updated} updated — ${r.total} total in your account.`);
 }
 
 function resolveLocation(options: LeadsOptions, config: Config): Location {
