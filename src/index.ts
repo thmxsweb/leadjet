@@ -3,6 +3,7 @@ import { registerConfigCommand } from './commands/config-cmd.js';
 import { registerContactsCommand } from './commands/contacts-cmd.js';
 import { registerFieldsCommand } from './commands/fields-cmd.js';
 import { registerFindCommand } from './commands/find-cmd.js';
+import { registerServeCommand } from './commands/serve-cmd.js';
 import { VERSION } from './version.js';
 
 const program = new Command();
@@ -13,6 +14,7 @@ program
   .version(VERSION, '-v, --version', 'print the version')
   .showHelpAfterError();
 
+registerServeCommand(program);
 registerFindCommand(program);
 registerContactsCommand(program);
 registerFieldsCommand(program);

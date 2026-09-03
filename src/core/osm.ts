@@ -1,10 +1,17 @@
+import type { Response } from 'undici';
 import { request, USER_AGENT } from './http.js';
 import { hasLocation, locationText, type Location } from './location.js';
 import type { ProxyRotator } from './proxy.js';
 import type { RawLead } from './types.js';
 
 const NOMINATIM = 'https://nominatim.openstreetmap.org/search';
-const OVERPASS = 'https://overpass-api.de/api/interpreter';
+
+/** Overpass mirrors, tried in order — the main instance rate-limits hard. */
+const OVERPASS_ENDPOINTS = [
+  'https://overpass.private.coffee/api/interpreter',
+  'https://overpass-api.de/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+];
 
 export interface OsmSearchOptions {
   term: string;
@@ -76,6 +83,34 @@ async function geocode(
   return [bb[0]!, bb[1]!, bb[2]!, bb[3]!]; // [south, north, west, east]
 }
 
+/** POST an Overpass QL query, falling back across mirrors on failure. */
+async function overpass(ql: string, proxies?: ProxyRotator): Promise<Response> {
+  let lastError: unknown;
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    try {
+      const res = await request(
+        endpoint,
+        {
+          method: 'POST',
+          headers: {
+            'user-agent': USER_AGENT,
+            'content-type': 'application/x-www-form-urlencoded',
+          },
+          body: `data=${encodeURIComponent(ql)}`,
+        },
+        proxies,
+      );
+      if (res.ok) return res;
+      lastError = new Error(`Overpass ${res.status} at ${endpoint}`);
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw new Error(
+    `All Overpass mirrors failed. Last: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+  );
+}
+
 function addressOf(tags: Record<string, string>): string | null {
   const parts = [
     [tags['addr:housenumber'], tags['addr:street']].filter(Boolean).join(' '),
@@ -100,16 +135,7 @@ export async function osmSearch(options: OsmSearchOptions): Promise<RawLead[]> {
   const clauses = filters.map((f) => `node[${f}](${bbox});way[${f}](${bbox});`).join('');
   const ql = `[out:json][timeout:25];(${clauses});out center tags ${Math.min(options.limit * 2, 120)};`;
 
-  const res = await request(
-    OVERPASS,
-    {
-      method: 'POST',
-      headers: { 'user-agent': USER_AGENT, 'content-type': 'application/x-www-form-urlencoded' },
-      body: `data=${encodeURIComponent(ql)}`,
-    },
-    options.proxies,
-  );
-  if (!res.ok) throw new Error(`Overpass error ${res.status}`);
+  const res = await overpass(ql, options.proxies);
 
   const data = (await res.json()) as {
     elements?: Array<{
