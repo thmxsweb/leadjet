@@ -72,6 +72,26 @@ leadjet find "restaurants in Lyon"  --append leads.ndjson
 streamable, one record per line — ideal for bulk DB import). **JSON** is best for
 a single programmatic import; **CSV** is best for spreadsheets and human review.
 
+#### Proxies
+
+Route requests through HTTP(S) proxies to avoid rate limits or IP blocks — one
+proxy, or a rotating list (round-robin, one proxy per page request).
+
+```bash
+# One proxy for this command
+leadjet find "cafes in Nice" --proxy http://user:pass@host:8080
+
+# Rotate through a file (one proxy per line; # comments allowed)
+leadjet find "cafes in Nice" --proxies-file proxies.txt
+
+# Or save a rotating list once
+leadjet config set proxies "http://host1:8080,http://user:pass@host2:8080"
+leadjet find "cafes in Nice"     # uses the saved proxies automatically
+```
+
+Precedence: `--proxy` › `--proxies-file` › saved `proxies`. Credentials are
+masked whenever the config is printed.
+
 ### `leadjet fields`
 
 List every field you can export (name, address, phone, website, rating, reviews, maps, type, status, lat, lng, place_id).

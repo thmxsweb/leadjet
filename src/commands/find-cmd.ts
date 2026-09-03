@@ -11,6 +11,7 @@ import {
   type FieldDef,
 } from '../core/fields.js';
 import { PlacesError, searchText } from '../core/places.js';
+import { parseProxyList, ProxyRotator } from '../core/proxy.js';
 import { log } from '../util/logger.js';
 
 interface FindOptions {
@@ -22,6 +23,8 @@ interface FindOptions {
   region?: string;
   language?: string;
   key?: string;
+  proxy?: string;
+  proxiesFile?: string;
 }
 
 const FORMATS: ExportFormat[] = ['json', 'csv', 'ndjson'];
@@ -38,6 +41,8 @@ export function registerFindCommand(program: Command): void {
     .option('--region <code>', 'ISO region code to bias results, e.g. FR, CA')
     .option('--language <code>', 'language code, e.g. fr, en')
     .option('--key <key>', 'Google Places API key (overrides the saved one)')
+    .option('--proxy <url>', 'route requests through one HTTP(S) proxy')
+    .option('--proxies-file <file>', 'rotate through proxies listed in a file (one per line)')
     .addHelpText(
       'after',
       '\nExamples:\n' +
@@ -93,6 +98,16 @@ export function registerFindCommand(program: Command): void {
       const region = options.region ?? config.region;
       const language = options.language ?? config.language;
 
+      const proxyUrls = resolveProxies(options, config);
+      const proxies = proxyUrls.length ? new ProxyRotator(proxyUrls) : undefined;
+      if (proxies) {
+        log.info(
+          log.dim(
+            `Routing through ${proxyUrls.length} prox${proxyUrls.length === 1 ? 'y' : 'ies'}.`,
+          ),
+        );
+      }
+
       log.info(`Searching Google Places for ${log.bold(query)} …`);
       try {
         const places = await searchText({
@@ -102,6 +117,7 @@ export function registerFindCommand(program: Command): void {
           limit,
           ...(region ? { region } : {}),
           ...(language ? { language } : {}),
+          ...(proxies ? { proxies } : {}),
         });
         const found = places.map((p) => placeToLead(p, defs));
         const columns = defs.map((d) => d.name);
@@ -132,8 +148,16 @@ export function registerFindCommand(program: Command): void {
           log.error(err instanceof Error ? err.message : String(err));
         }
         process.exitCode = 1;
+      } finally {
+        await proxies?.close();
       }
     });
+}
+
+function resolveProxies(options: FindOptions, config: { proxies?: string[] }): string[] {
+  if (options.proxy) return [options.proxy];
+  if (options.proxiesFile) return parseProxyList(readFileSync(options.proxiesFile, 'utf8'));
+  return config.proxies ?? [];
 }
 
 function resolveFormat(

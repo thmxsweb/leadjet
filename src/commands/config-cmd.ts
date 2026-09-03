@@ -18,6 +18,7 @@ const KEY_TO_PROP: Record<ConfigKey, keyof Config> = {
   format: 'format',
   region: 'region',
   language: 'language',
+  proxies: 'proxies',
 };
 
 export function registerConfigCommand(program: Command): void {

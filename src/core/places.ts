@@ -1,3 +1,5 @@
+import { fetch, type RequestInit } from 'undici';
+import type { ProxyRotator } from './proxy.js';
 import type { PlaceV1 } from './types.js';
 
 const ENDPOINT = 'https://places.googleapis.com/v1/places:searchText';
@@ -10,6 +12,8 @@ export interface SearchOptions {
   limit: number;
   region?: string;
   language?: string;
+  /** Optional proxy pool; a different proxy is used per page request. */
+  proxies?: ProxyRotator;
 }
 
 export class PlacesError extends Error {
@@ -25,7 +29,8 @@ export class PlacesError extends Error {
 
 /**
  * Google Places API v1 text search. Pages through results (20 at a time) up to
- * `limit`, requesting only the fields in `fieldMask`.
+ * `limit`, requesting only the fields in `fieldMask`. When a proxy pool is
+ * given, each page goes through the next proxy.
  */
 export async function searchText(options: SearchOptions): Promise<PlaceV1[]> {
   const results: PlaceV1[] = [];
@@ -40,7 +45,7 @@ export async function searchText(options: SearchOptions): Promise<PlaceV1[]> {
     if (options.language) body.languageCode = options.language;
     if (pageToken) body.pageToken = pageToken;
 
-    const res = await fetch(ENDPOINT, {
+    const init: RequestInit = {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -48,7 +53,11 @@ export async function searchText(options: SearchOptions): Promise<PlaceV1[]> {
         'x-goog-fieldmask': `${options.fieldMask},nextPageToken`,
       },
       body: JSON.stringify(body),
-    });
+    };
+    const dispatcher = options.proxies?.next();
+    if (dispatcher) init.dispatcher = dispatcher;
+
+    const res = await fetch(ENDPOINT, init);
 
     if (!res.ok) {
       const detail = (await res.json().catch(() => null)) as {

@@ -14,6 +14,8 @@ export interface Config {
   region?: string;
   /** Default language code (e.g. `fr`, `en`). */
   language?: string;
+  /** HTTP(S) proxies to rotate through for requests. */
+  proxies?: string[];
 }
 
 export type ExportFormat = 'json' | 'csv' | 'ndjson';
@@ -60,7 +62,14 @@ export function saveConfig(config: Config): void {
 }
 
 /** Config keys the user may set via the CLI, mapped to their parsed shape. */
-export const CONFIG_KEYS = ['places-key', 'fields', 'format', 'region', 'language'] as const;
+export const CONFIG_KEYS = [
+  'places-key',
+  'fields',
+  'format',
+  'region',
+  'language',
+  'proxies',
+] as const;
 export type ConfigKey = (typeof CONFIG_KEYS)[number];
 
 export function isConfigKey(value: string): value is ConfigKey {
@@ -88,19 +97,40 @@ export function setConfigValue(config: Config, key: ConfigKey, value: string): C
     case 'language':
       next.language = value.toLowerCase();
       break;
+    case 'proxies':
+      next.proxies = value
+        .split(',')
+        .map((p) => p.trim())
+        .filter(Boolean);
+      break;
   }
   return next;
 }
 
-/** A view of the config safe to print (the API key is masked). */
+/** A view of the config safe to print (secrets masked). */
 export function redactConfig(config: Config): Record<string, unknown> {
   return {
     ...config,
     placesKey: config.placesKey ? maskKey(config.placesKey) : undefined,
+    proxies: config.proxies?.map(maskProxyCreds),
   };
 }
 
 function maskKey(key: string): string {
   if (key.length <= 8) return '••••';
   return `${key.slice(0, 4)}…${key.slice(-4)}`;
+}
+
+/** Hide any user:pass credentials in a proxy URL. */
+function maskProxyCreds(url: string): string {
+  try {
+    const u = new URL(url);
+    if (u.username || u.password) {
+      u.username = '***';
+      u.password = '';
+    }
+    return u.toString();
+  } catch {
+    return url.replace(/\/\/[^@/]+@/, '//***@');
+  }
 }
