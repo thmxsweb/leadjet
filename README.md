@@ -3,7 +3,7 @@
 Find business leads from **Google Places** and export exactly the fields you want — as JSON, CSV, or NDJSON. Ships as an npm CLI and as standalone binaries (no Node required).
 
 [![CI](https://github.com/thmxsweb/leadjet/actions/workflows/ci.yml/badge.svg)](https://github.com/thmxsweb/leadjet/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/leadjet.svg)](https://www.npmjs.com/package/leadjet)
+[![npm](https://img.shields.io/npm/v/@thmxsweb/leadjet.svg)](https://www.npmjs.com/package/@thmxsweb/leadjet)
 [![license](https://img.shields.io/github/license/thmxsweb/leadjet)](./LICENSE)
 
 ## Install
@@ -11,7 +11,7 @@ Find business leads from **Google Places** and export exactly the fields you wan
 **npm** (needs Node 18.17+):
 
 ```bash
-npm install -g leadjet
+npm install -g @thmxsweb/leadjet
 ```
 
 **Standalone binary** (no Node): download from the [Releases](https://github.com/thmxsweb/leadjet/releases) page — `leadjet-win.exe`, `leadjet-macos`, `leadjet-linux`. On Windows, the installer places `leadjet` in `C:\Program Files (x86)\Leadjet` and adds it to your `PATH`.
