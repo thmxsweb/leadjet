@@ -16,8 +16,7 @@ a{color:var(--red-h);text-decoration:none}a:hover{text-decoration:underline}
 .app{display:grid;grid-template-columns:216px 1fr;height:100vh}
 /* sidebar */
 .side{background:#0e0f12;border-right:1px solid var(--line);display:flex;flex-direction:column;padding:16px 12px;gap:4px}
-.logo{display:flex;align-items:center;gap:9px;font-size:16px;font-weight:800;letter-spacing:-.02em;padding:6px 8px 14px}
-.logo .m{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--red),#b5262b);display:grid;place-items:center;color:#fff;font-size:13px;font-weight:900;box-shadow:0 2px 10px rgba(229,72,77,.4)}
+.logo{font-size:19px;font-weight:800;letter-spacing:-.03em;padding:4px 8px 16px}
 .logo b{color:var(--red)}
 .nav a{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;color:var(--mut);font-weight:600;font-size:13px;cursor:pointer}
 .nav a .ic{width:16px;height:16px;opacity:.9}
@@ -104,11 +103,11 @@ tbody tr.sel td{background:var(--red-dim)}
 </style></head><body>
 <div class="app">
   <aside class="side">
-    <div class="logo"><span class="m">L</span>lead<b>jet</b></div>
+    <div class="logo">lead<b>jet</b></div>
     <nav class="nav">
-      <a data-view="leads" class="active"><span class="ic">&#9678;</span> Leads</a>
-      <a data-view="jump"><span class="ic">&#8644;</span> Join-Jump</a>
-      <a data-view="settings"><span class="ic">&#9881;</span> Réglages</a>
+      <a data-view="leads" class="active">Leads</a>
+      <a data-view="jump">Join-Jump</a>
+      <a data-view="settings">Réglages</a>
     </nav>
     <div class="foot"><span>v0.1.0</span><span class="dot" title="serveur actif"></span></div>
   </aside>
@@ -386,9 +385,29 @@ function doExport(rows){
 }
 
 /* cvcrush */
-function cvUrl(kind){var id=(CFG.cvcrush&&CFG.cvcrush.appId)||"";var redir=encodeURIComponent(location.origin+"/cvcrush/callback");return "https://cvcrush.co/"+kind+"?app=leadjet&app_id="+encodeURIComponent(id)+"&redirect_uri="+redir}
-el("cvUse").onclick=function(){window.open(cvUrl("connect"),"_blank")};
-el("cvExport").onclick=function(){var rows=selectedLeads();window.open(cvUrl("import")+"&count="+rows.length,"_blank")};
+function cvBase(kind){
+  var id=(CFG.cvcrush&&CFG.cvcrush.appId)||"";
+  var redir=encodeURIComponent(location.origin+"/cvcrush/callback");
+  return "https://cvcrush.co/"+kind+"?app=leadjet&app_id="+encodeURIComponent(id)+"&redirect_uri="+redir;
+}
+function toCsv(rows){
+  var head=COLS.join(",");
+  var body=rows.map(function(r){return COLS.map(function(c){return csvCell(r[c])}).join(",")}).join("\\n");
+  return head+"\\n"+body;
+}
+el("cvUse").onclick=function(){window.open(cvBase("connect"),"_blank")};
+el("cvExport").onclick=function(){
+  var rows=selectedLeads();
+  if(!rows.length){el("statusLine").textContent="rien à exporter vers cvcrush";return}
+  var csv=toCsv(rows);
+  var b64=btoa(unescape(encodeURIComponent(csv))); // utf-8 safe base64
+  var url=cvBase("import")+"&count="+rows.length+"&format=csv&data="+encodeURIComponent(b64);
+  if(url.length>60000){ // too big for a URL: hand cvcrush a data: URI to fetch instead
+    var file="data:text/csv;base64,"+b64;
+    url=cvBase("import")+"&count="+rows.length+"&format=csv&file="+encodeURIComponent(file);
+  }
+  window.open(url,"_blank");
+};
 
 loadCfg();render();
 `;
