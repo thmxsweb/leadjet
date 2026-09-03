@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag (e.g. v0.1.0)'
+        required: true
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    name: Build binaries, installer, publish
+    runs-on: ubuntu-latest
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - run: pnpm install --frozen-lockfile
+      - name: Verify
+        run: pnpm run check
+
+      - name: Build standalone binaries (win/macOS/linux)
+        run: pnpm run build:binaries
+
+      - name: Build Windows installer (Program Files x86 + PATH)
+        continue-on-error: true
+        run: |
+          sudo apt-get update && sudo apt-get install -y nsis
+          # EnVar plugin for clean PATH edits.
+          curl -fsSL -o /tmp/envar.zip https://nsis.sourceforge.io/mediawiki/images/7/7f/EnVar_plugin.zip
+          sudo unzip -o /tmp/envar.zip -d /usr/share/nsis
+          makensis -DVERSION=${GITHUB_REF_NAME#v} installer/leadjet.nsi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: ${{ github.event.inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          files: |
+            release/leadjet-win.exe
+            release/leadjet-macos
+            release/leadjet-linux
+            release/leadjet-setup.exe
+
+      - name: Publish to npm (if token configured)
+        if: ${{ env.NPM_TOKEN != '' }}
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

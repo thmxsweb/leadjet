@@ -1,57 +1,67 @@
 {
   "name": "leadjet",
-  "version": "0.0.1",
-  "description": "A client-acquisition control plane for web-dev freelancers on Join-Jump.",
-  "private": true,
-  "author": "thmxsweb (https://github.com/thmxsweb)",
+  "version": "0.1.0",
+  "description": "Find business leads from Google Places and export exactly the fields you want (JSON, CSV, NDJSON). Ships as an npm CLI and standalone binaries.",
+  "keywords": [
+    "leads",
+    "google-places",
+    "cli",
+    "prospecting",
+    "export",
+    "lead-generation"
+  ],
   "license": "MIT",
-  "main": "./out/main/index.js",
-  "type": "module",
+  "author": "thmxsweb (https://github.com/thmxsweb)",
+  "homepage": "https://github.com/thmxsweb/leadjet#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thmxsweb/leadjet.git"
+  },
+  "bugs": {
+    "url": "https://github.com/thmxsweb/leadjet/issues"
+  },
+  "type": "commonjs",
+  "bin": "dist/index.cjs",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "engines": {
-    "node": ">=20"
+    "node": ">=18.17"
   },
   "packageManager": "pnpm@11.9.0",
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "electron-vite build",
-    "preview": "electron-vite preview",
-    "start": "electron-vite preview",
-    "typecheck:node": "tsc -p tsconfig.node.json --noEmit",
-    "typecheck:web": "tsc -p tsconfig.web.json --noEmit",
-    "typecheck": "pnpm run typecheck:node && pnpm run typecheck:web",
+    "build": "tsup",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run build",
-    "package": "electron-vite build && electron-builder"
+    "test": "vitest run",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run test && pnpm run build",
+    "build:binaries": "pnpm run build && pkg . --targets node20-win-x64,node20-macos-x64,node20-linux-x64 --out-path release",
+    "prepack": "pnpm run build"
   },
   "dependencies": {
-    "@thmxsweb/jj-sdk": "^0.4.0"
+    "commander": "^12.1.0",
+    "picocolors": "^1.1.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
-    "@tanstack/react-query": "^5.59.16",
     "@types/node": "^22.7.5",
-    "@types/react": "^18.3.11",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.2",
-    "autoprefixer": "^10.4.20",
-    "electron": "^33.0.2",
-    "electron-builder": "^25.1.8",
-    "electron-vite": "^2.3.0",
+    "@yao-pkg/pkg": "^6.1.1",
     "eslint": "^9.36.0",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-react-hooks": "^5.0.0",
-    "lucide-react": "^0.454.0",
-    "postcss": "^8.4.47",
     "prettier": "^3.6.2",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "tailwindcss": "^3.4.14",
+    "tsup": "^8.5.0",
+    "tsx": "^4.19.2",
     "typescript": "^5.6.3",
     "typescript-eslint": "^8.44.0",
-    "vite": "^5.4.9",
-    "zustand": "^5.0.0"
+    "vitest": "^3.2.4"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
