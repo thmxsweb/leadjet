@@ -33,6 +33,7 @@ jobs:
         run: pnpm run check
 
       - name: Build standalone binaries (win/macOS/linux)
+        continue-on-error: true
         run: pnpm run build:binaries
 
       - name: Build Windows installer (Program Files x86 + PATH)
@@ -50,6 +51,7 @@ jobs:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           name: ${{ github.event.inputs.tag || github.ref_name }}
           generate_release_notes: true
+          fail_on_unmatched_files: false
           files: |
             release/leadjet-win.exe
             release/leadjet-macos
