@@ -43,7 +43,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "check": "pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run test && pnpm run build",
-    "build:binaries": "pnpm run build && pkg . --targets node18-win-x64,node18-macos-x64,node18-linux-x64 --out-path release",
+    "build:binaries": "pnpm run build && pkg . --targets node22-win-x64,node22-macos-x64,node22-linux-x64 --out-path release",
     "prepack": "pnpm run build"
   },
   "dependencies": {
