@@ -10,8 +10,14 @@ export interface Config {
   fields?: string[];
   /** Default output format. */
   format?: ExportFormat;
-  /** Default region code (ISO-3166-1, e.g. `FR`, `CA`). */
+  /** Default country (name or ISO code, e.g. `Canada` / `CA`). */
+  country?: string;
+  /** Default region / state / province (e.g. `Quebec`, `Île-de-France`). */
   region?: string;
+  /** Default city (e.g. `Montreal`, `Paris`). */
+  city?: string;
+  /** Default source: `places` or `osm`. */
+  source?: string;
   /** Default language code (e.g. `fr`, `en`). */
   language?: string;
   /** HTTP(S) proxies to rotate through for requests. */
@@ -66,7 +72,10 @@ export const CONFIG_KEYS = [
   'places-key',
   'fields',
   'format',
+  'country',
   'region',
+  'city',
+  'source',
   'language',
   'proxies',
 ] as const;
@@ -91,8 +100,17 @@ export function setConfigValue(config: Config, key: ConfigKey, value: string): C
     case 'format':
       next.format = value as ExportFormat;
       break;
+    case 'country':
+      next.country = value.trim();
+      break;
     case 'region':
-      next.region = value.toUpperCase();
+      next.region = value.trim();
+      break;
+    case 'city':
+      next.city = value.trim();
+      break;
+    case 'source':
+      next.source = value.trim().toLowerCase();
       break;
     case 'language':
       next.language = value.toLowerCase();

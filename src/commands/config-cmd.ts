@@ -16,7 +16,10 @@ const KEY_TO_PROP: Record<ConfigKey, keyof Config> = {
   'places-key': 'placesKey',
   fields: 'fields',
   format: 'format',
+  country: 'country',
   region: 'region',
+  city: 'city',
+  source: 'source',
   language: 'language',
   proxies: 'proxies',
 };

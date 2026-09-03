@@ -19,5 +19,30 @@ export interface PlaceV1 {
   priceLevel?: string;
 }
 
+/** A cell value in an exported lead. */
+export type Value = string | number | boolean | null;
+
+/**
+ * A normalized lead produced by any source (Google Places, OpenStreetMap). The
+ * exporter projects this down to the fields the user asked for.
+ */
+export interface RawLead {
+  name: Value;
+  address: Value;
+  phone: Value;
+  email: Value;
+  website: Value;
+  rating: Value;
+  reviews: Value;
+  maps: Value;
+  type: Value;
+  status: Value;
+  lat: Value;
+  lng: Value;
+  place_id: Value;
+  /** Which source produced this lead. */
+  source: string;
+}
+
 /** An exported lead: a flat record keyed by the user-selected field names. */
-export type Lead = Record<string, string | number | boolean | null>;
+export type Lead = Record<string, Value>;

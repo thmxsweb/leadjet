@@ -12,8 +12,10 @@ describe('setConfigValue', () => {
     expect(c.fields).toEqual(['name', 'phone', 'website']);
   });
 
-  it('normalizes region (upper) and language (lower)', () => {
-    expect(setConfigValue({}, 'region', 'fr').region).toBe('FR');
+  it('stores country/region/city as-is and lowercases language', () => {
+    expect(setConfigValue({}, 'country', 'Canada').country).toBe('Canada');
+    expect(setConfigValue({}, 'region', ' Quebec ').region).toBe('Quebec');
+    expect(setConfigValue({}, 'city', ' Montreal ').city).toBe('Montreal');
     expect(setConfigValue({}, 'language', 'EN').language).toBe('en');
   });
 });

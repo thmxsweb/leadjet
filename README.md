@@ -35,21 +35,50 @@ Get a key in [Google Cloud](https://console.cloud.google.com/) and enable **Plac
 
 ### `leadjet find <query...>`
 
-Search Google Places and export the results.
+Find businesses and export them. Two sources:
+
+- **`places`** — Google Places (New). Best coverage and ratings; needs an API key.
+- **`osm`** — OpenStreetMap (Nominatim + Overpass). **Free, no key.** Great for
+  finding businesses that have no website yet (they sort first).
+
+If you don't pass `--source`, leadjet uses `places` when a key is set, otherwise `osm`.
 
 | Option                | Description                                                                                            |
 | --------------------- | ------------------------------------------------------------------------------------------------------ |
+| `-s, --source <src>`  | `places` (Google, needs key) or `osm` (OpenStreetMap, free).                                           |
 | `-f, --fields <list>` | Comma-separated fields to export (see `leadjet fields`). Default: `name,address,phone,website,rating`. |
 | `-l, --limit <n>`     | Max leads (paginates 20 at a time, up to 200). Default `20`.                                           |
 | `-o, --out <file>`    | Write to a file instead of stdout. Format is inferred from the extension.                              |
 | `--format <fmt>`      | `json` (default), `csv`, or `ndjson`.                                                                  |
-| `--region <code>`     | ISO region code to bias results, e.g. `FR`, `CA`.                                                      |
+| `--country <name>`    | Target country by name or ISO code, e.g. `Canada`, `CA`, `France`.                                    |
+| `--region <name>`     | Target region / state / province, e.g. `Quebec`, `QC`, `Île-de-France`.                               |
+| `--city <name>`       | Target city, e.g. `Montreal`, `Paris`, `Lyon`.                                                        |
+| `--category <cat>`    | OSM only: `any`, `shops`, `food`, `craft`, `services`, `beauty`.                                       |
 | `--language <code>`   | Language code, e.g. `fr`, `en`.                                                                        |
-| `--key <key>`         | Use this API key instead of the saved one.                                                             |
+| `--key <key>`         | Use this API key instead of the saved one (Places).                                                   |
+
+#### Targeting a location
+
+Combine `--country`, `--region`, and `--city` to aim at exactly one place. The
+same flags work for both sources:
 
 ```bash
-leadjet find "boulangeries à Lyon" --fields name,phone,maps --limit 50 --region FR
-leadjet find "dentists in Austin" -o dentists.json
+# Google Places
+leadjet find "restaurants" --city Montreal --region QC --country CA --limit 50
+leadjet find "boulangeries" --city Paris --region "Île-de-France" --country FR
+
+# OpenStreetMap (free, no key) — needs at least one of country/region/city
+leadjet find "plumbers" --source osm --city Lyon --country FR --append leads.ndjson
+leadjet find "coiffeurs" --source osm --city "Saint-Jean-sur-Richelieu" --country CA
+```
+
+You can also save a default target so you don't repeat it:
+
+```bash
+leadjet config set country Canada
+leadjet config set region Quebec
+leadjet config set city Montreal
+leadjet config set source osm
 ```
 
 Output goes to **stdout** so you can pipe it; progress and messages go to stderr.

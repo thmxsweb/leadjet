@@ -1,26 +1,33 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import type { Command } from 'commander';
-import { loadConfig, type ExportFormat } from '../core/config.js';
+import { loadConfig, type Config, type ExportFormat } from '../core/config.js';
 import { mergeLeads, parseDataset, type DatasetFormat } from '../core/dataset.js';
 import { serialize } from '../core/export.js';
 import {
   buildFieldMask,
   DEFAULT_FIELDS,
-  placeToLead,
+  project,
   resolveFields,
   type FieldDef,
 } from '../core/fields.js';
-import { PlacesError, searchText } from '../core/places.js';
+import { countryCode, placesQuery, type Location } from '../core/location.js';
+import { osmSearch } from '../core/osm.js';
+import { placeToRaw, PlacesError, searchText } from '../core/places.js';
 import { parseProxyList, ProxyRotator } from '../core/proxy.js';
+import type { RawLead } from '../core/types.js';
 import { log } from '../util/logger.js';
 
 interface FindOptions {
+  source?: string;
   fields?: string;
   limit: string;
   out?: string;
   append?: string;
   format?: string;
+  country?: string;
   region?: string;
+  city?: string;
+  category?: string;
   language?: string;
   key?: string;
   proxy?: string;
@@ -32,13 +39,17 @@ const FORMATS: ExportFormat[] = ['json', 'csv', 'ndjson'];
 export function registerFindCommand(program: Command): void {
   program
     .command('find <query...>')
-    .description('Find leads from Google Places and export them')
+    .description('Find leads (Google Places or OpenStreetMap) and export them')
+    .option('-s, --source <src>', 'places (Google, needs key) or osm (OpenStreetMap, free)')
     .option('-f, --fields <list>', 'comma-separated fields to export (see "leadjet fields")')
     .option('-l, --limit <n>', 'maximum number of leads', '20')
     .option('-o, --out <file>', 'write to a file (overwrites); format inferred from extension')
     .option('-a, --append <file>', 'append to a dataset file, de-duplicated (json or ndjson)')
     .option('--format <fmt>', 'json | csv | ndjson')
-    .option('--region <code>', 'ISO region code to bias results, e.g. FR, CA')
+    .option('--country <name|code>', 'target country, e.g. Canada, CA, France')
+    .option('--region <name>', 'target region/state/province, e.g. Quebec, Île-de-France')
+    .option('--city <name>', 'target city, e.g. Montreal, Paris')
+    .option('--category <cat>', 'OSM category: any|shops|food|craft|services|beauty')
     .option('--language <code>', 'language code, e.g. fr, en')
     .option('--key <key>', 'Google Places API key (overrides the saved one)')
     .option('--proxy <url>', 'route requests through one HTTP(S) proxy')
@@ -46,20 +57,12 @@ export function registerFindCommand(program: Command): void {
     .addHelpText(
       'after',
       '\nExamples:\n' +
-        '  $ leadjet find "plumbers in Bordeaux" --fields name,phone,website --limit 40\n' +
-        '  $ leadjet find "hair salons in Montreal" -o leads.csv\n' +
-        '  $ leadjet find "bakeries in Lyon" --append leads.ndjson   # grows a deduped dataset\n',
+        '  $ leadjet find "restaurants" --city Montreal --region QC --country CA\n' +
+        '  $ leadjet find "boulangeries" --city Paris --region "Île-de-France" --country FR\n' +
+        '  $ leadjet find "plumbers" --source osm --city Lyon --country FR --append leads.ndjson\n',
     )
     .action(async (queryParts: string[], options: FindOptions) => {
       const config = loadConfig();
-      const key = options.key ?? config.placesKey;
-      if (!key) {
-        log.error('No Google Places API key set.');
-        log.info(`Set it once with:  ${log.bold('leadjet config set places-key <YOUR_KEY>')}`);
-        log.info(log.dim('Create a key in Google Cloud and enable the "Places API (New)".'));
-        process.exitCode = 1;
-        return;
-      }
 
       const target = options.append ?? options.out;
       const format = resolveFormat(
@@ -88,15 +91,22 @@ export function registerFindCommand(program: Command): void {
         process.exitCode = 1;
         return;
       }
-      // A stable key is required to de-duplicate an appended dataset.
       if (options.append && !defs.some((d) => d.name === 'place_id')) {
         defs = [...defs, ...resolveFields(['place_id'])];
       }
 
+      const term = queryParts.join(' ');
       const limit = clampLimit(options.limit);
-      const query = queryParts.join(' ');
-      const region = options.region ?? config.region;
       const language = options.language ?? config.language;
+      const location = resolveLocation(options, config);
+
+      const key = options.key ?? config.placesKey;
+      const source = (options.source ?? config.source ?? (key ? 'places' : 'osm')).toLowerCase();
+      if (source !== 'places' && source !== 'osm') {
+        log.error(`Invalid --source "${source}". Use "places" or "osm".`);
+        process.exitCode = 1;
+        return;
+      }
 
       const proxyUrls = resolveProxies(options, config);
       const proxies = proxyUrls.length ? new ProxyRotator(proxyUrls) : undefined;
@@ -108,18 +118,42 @@ export function registerFindCommand(program: Command): void {
         );
       }
 
-      log.info(`Searching Google Places for ${log.bold(query)} …`);
       try {
-        const places = await searchText({
-          key,
-          query,
-          fieldMask: buildFieldMask(defs),
-          limit,
-          ...(region ? { region } : {}),
-          ...(language ? { language } : {}),
-          ...(proxies ? { proxies } : {}),
-        });
-        const found = places.map((p) => placeToLead(p, defs));
+        let raws: RawLead[];
+        if (source === 'places') {
+          if (!key) {
+            log.error('No Google Places API key set.');
+            log.info(`Set it: ${log.bold('leadjet config set places-key <KEY>')}`);
+            log.info(
+              `Or use the free source: ${log.bold('--source osm')} with --city/--region/--country.`,
+            );
+            process.exitCode = 1;
+            return;
+          }
+          const region = countryCode(options.country ?? config.country);
+          log.info(`Searching Google Places for ${log.bold(placesQuery(term, location))} …`);
+          const places = await searchText({
+            key,
+            query: placesQuery(term, location),
+            fieldMask: buildFieldMask(defs),
+            limit,
+            ...(region ? { region } : {}),
+            ...(language ? { language } : {}),
+            ...(proxies ? { proxies } : {}),
+          });
+          raws = places.map(placeToRaw);
+        } else {
+          log.info(`Searching OpenStreetMap for ${log.bold(term)} …`);
+          raws = await osmSearch({
+            term,
+            location,
+            limit,
+            ...(options.category ? { category: options.category } : {}),
+            ...(proxies ? { proxies } : {}),
+          });
+        }
+
+        const found = raws.map((r) => project(r, defs));
         const columns = defs.map((d) => d.name);
 
         if (options.append) {
@@ -154,7 +188,18 @@ export function registerFindCommand(program: Command): void {
     });
 }
 
-function resolveProxies(options: FindOptions, config: { proxies?: string[] }): string[] {
+function resolveLocation(options: FindOptions, config: Config): Location {
+  const country = options.country ?? config.country;
+  const region = options.region ?? config.region;
+  const city = options.city ?? config.city;
+  return {
+    ...(country ? { country } : {}),
+    ...(region ? { region } : {}),
+    ...(city ? { city } : {}),
+  };
+}
+
+function resolveProxies(options: FindOptions, config: Config): string[] {
   if (options.proxy) return [options.proxy];
   if (options.proxiesFile) return parseProxyList(readFileSync(options.proxiesFile, 'utf8'));
   return config.proxies ?? [];
