@@ -33,6 +33,8 @@ export interface EnrichedLead {
   created: string;
   size: string;
   siren: string;
+  siret: string;
+  vat: string;
   confidence: string;
   source: string;
   maps: string;
@@ -169,6 +171,8 @@ async function enrichOne(raw: RawLead, opts: PipelineOptions): Promise<EnrichedL
     regCp: '',
     regAddress: '',
     siren: '',
+    siret: '',
+    vat: '',
     confidence: '' as string,
   };
   if (opts.enrichOwner && str(raw.name)) {
@@ -215,6 +219,8 @@ async function enrichOne(raw: RawLead, opts: PipelineOptions): Promise<EnrichedL
     created: owner.created,
     size: owner.size,
     siren: owner.siren,
+    siret: owner.siret,
+    vat: owner.vat,
     confidence: owner.confidence,
     source: raw.source,
     maps: str(raw.maps),

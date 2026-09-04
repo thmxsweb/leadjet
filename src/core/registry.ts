@@ -17,7 +17,16 @@ export interface OwnerInfo {
   regCp: string;
   regAddress: string;
   siren: string;
+  siret: string;
+  vat: string;
   confidence: 'high' | 'medium';
+}
+
+/** French intra-community VAT number, computed from the SIREN. */
+function frVat(siren: string): string {
+  if (!/^\d{9}$/.test(siren)) return '';
+  const key = (12 + 3 * (Number(siren) % 97)) % 97;
+  return `FR${String(key).padStart(2, '0')}${siren}`;
 }
 
 const API = 'https://recherche-entreprises.api.gouv.fr/search';
@@ -93,7 +102,7 @@ interface Etablissement {
   tranche_effectif_salarie?: string;
   etat_administratif?: string;
   dirigeants?: Dirigeant[];
-  siege?: { code_postal?: string; libelle_commune?: string; adresse?: string };
+  siege?: { code_postal?: string; libelle_commune?: string; adresse?: string; siret?: string };
 }
 
 const titleCase = (s: string): string =>
@@ -174,6 +183,8 @@ export async function lookupOwner(
     regCp: m.siege?.code_postal ?? cp ?? '',
     regAddress: m.siege?.adresse ?? '',
     siren: m.siren ?? '',
+    siret: m.siege?.siret ?? '',
+    vat: frVat(m.siren ?? ''),
     confidence: cp ? 'high' : 'medium',
   };
 }

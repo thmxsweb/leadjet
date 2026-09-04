@@ -55,6 +55,8 @@ export const LEAD_COLUMNS = [
   'created',
   'size',
   'siren',
+  'siret',
+  'vat',
   'confidence',
   'source',
 ];
