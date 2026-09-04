@@ -1,6 +1,22 @@
 import type { EnrichedLead } from './pipeline.js';
 
-export const DEFAULT_WEB_URL = 'http://localhost:3000';
+export const DEFAULT_WEB_URL = 'https://leadjet-web.vercel.app';
+
+/** Check the current link: returns the account email + expiry, or null if invalid. */
+export async function me(
+  webUrl: string,
+  token: string,
+): Promise<{ email: string; expiresAt: string } | null> {
+  try {
+    const res = await fetch(`${webUrl}/api/cli/me`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as { email: string; expiresAt: string };
+  } catch {
+    return null;
+  }
+}
 
 export interface LinkStart {
   code: string;
