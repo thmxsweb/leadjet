@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -23,12 +22,6 @@ export interface Config {
   language?: string;
   /** HTTP(S) proxies to rotate through for requests. */
   proxies?: string[];
-  /** Join-Jump login email (for exporting leads as clients). */
-  jumpEmail?: string;
-  /** Join-Jump password. */
-  jumpPassword?: string;
-  /** Stable per-install id used by the cvcrush integration. */
-  appId?: string;
   /** leadjet-web base URL (Vercel in prod, localhost in dev). */
   webUrl?: string;
   /** Device token linking this CLI to the web account (valid 7 days). */
@@ -91,8 +84,6 @@ export const CONFIG_KEYS = [
   'source',
   'language',
   'proxies',
-  'jump-email',
-  'jump-password',
   'web-url',
 ] as const;
 export type ConfigKey = (typeof CONFIG_KEYS)[number];
@@ -137,12 +128,6 @@ export function setConfigValue(config: Config, key: ConfigKey, value: string): C
         .map((p) => p.trim())
         .filter(Boolean);
       break;
-    case 'jump-email':
-      next.jumpEmail = value.trim();
-      break;
-    case 'jump-password':
-      next.jumpPassword = value;
-      break;
     case 'web-url':
       next.webUrl = value.trim().replace(/\/+$/, '');
       break;
@@ -150,21 +135,11 @@ export function setConfigValue(config: Config, key: ConfigKey, value: string): C
   return next;
 }
 
-/** Return the stable per-install id, creating and persisting one if absent. */
-export function getAppId(): string {
-  const config = loadConfig();
-  if (config.appId) return config.appId;
-  const appId = randomUUID();
-  saveConfig({ ...config, appId });
-  return appId;
-}
-
 /** A view of the config safe to print (secrets masked). */
 export function redactConfig(config: Config): Record<string, unknown> {
   return {
     ...config,
     placesKey: config.placesKey ? maskKey(config.placesKey) : undefined,
-    jumpPassword: config.jumpPassword ? '••••••••' : undefined,
     linkToken: config.linkToken ? '••••••••' : undefined,
     proxies: config.proxies?.map(maskProxyCreds),
   };

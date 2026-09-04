@@ -22,8 +22,6 @@ const KEY_TO_PROP: Record<ConfigKey, keyof Config> = {
   source: 'source',
   language: 'language',
   proxies: 'proxies',
-  'jump-email': 'jumpEmail',
-  'jump-password': 'jumpPassword',
   'web-url': 'webUrl',
 };
 

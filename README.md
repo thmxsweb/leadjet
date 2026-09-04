@@ -31,26 +31,15 @@ leadjet find "hair salons in Montreal" --fields name,phone,website,rating -o lea
 
 Get a key in [Google Cloud](https://console.cloud.google.com/) and enable **Places API (New)**.
 
-## Web app (`leadjet serve`)
+## Account (leadjet-web)
 
-Don't want to memorize flags? Run one command and do everything in your browser:
+The dashboard, account and integrations live in the **leadjet-web** app
+(Vercel). Link this CLI to your account, then push leads to it:
 
 ```bash
-leadjet serve      # opens http://127.0.0.1:4317
+leadjet link                                   # link this CLI for 7 days
+leadjet leads "restaurants" --city Lyon --push # find + enrich + push to your account
 ```
-
-Pick a niche and a city, click **Générer**, and leadjet finds businesses, looks up
-the **owner** (French company registry), **audits any existing website** (dead?
-not mobile? built on Wix/PagesJaunes?), and **scores each lead 0-100** as a
-web-services prospect — streaming results into a live, sortable, filterable table.
-Export the current view to **CSV / JSON / HTML** in one click. All free (no key
-needed with the OpenStreetMap source).
-
-The lead score combines **web need** (no site 60 · dead site 55 · DIY builder 35 ·
-modern site 10), **reachability** (phone +12 · email +8) and **business value**
-(owner known +8 · established +6 · has staff +6). Hot ≥ 70, Warm 45-69, Cold < 45.
-
-Options: `-p, --port <n>` (default `4317`), `--host <host>`, `--no-open`.
 
 ## Commands
 
