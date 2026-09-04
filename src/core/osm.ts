@@ -19,6 +19,7 @@ export interface OsmSearchOptions {
   location: Location;
   limit: number;
   category?: string;
+  distanceKm?: number;
   proxies?: ProxyRotator;
 }
 
@@ -67,10 +68,16 @@ function filtersFor(term: string, category?: string): string[] {
   return ['"shop"', '"craft"', '"office"'];
 }
 
-async function geocode(
-  query: string,
-  proxies?: ProxyRotator,
-): Promise<[number, number, number, number] | null> {
+interface Geo {
+  south: number;
+  north: number;
+  west: number;
+  east: number;
+  lat: number;
+  lon: number;
+}
+
+async function geocode(query: string, proxies?: ProxyRotator): Promise<Geo | null> {
   const url = `${NOMINATIM}?format=json&limit=1&q=${encodeURIComponent(query)}`;
   const res = await request(
     url,
@@ -78,10 +85,18 @@ async function geocode(
     proxies,
   );
   if (!res.ok) return null;
-  const data = (await res.json()) as Array<{ boundingbox?: string[] }>;
-  const bb = data[0]?.boundingbox?.map(Number);
+  const data = (await res.json()) as Array<{ boundingbox?: string[]; lat?: string; lon?: string }>;
+  const first = data[0];
+  const bb = first?.boundingbox?.map(Number);
   if (!bb || bb.length < 4) return null;
-  return [bb[0]!, bb[1]!, bb[2]!, bb[3]!]; // [south, north, west, east]
+  return {
+    south: bb[0]!,
+    north: bb[1]!,
+    west: bb[2]!,
+    east: bb[3]!,
+    lat: Number(first?.lat),
+    lon: Number(first?.lon),
+  };
 }
 
 /** POST an Overpass QL query, falling back across mirrors on failure. */
@@ -127,9 +142,18 @@ export async function osmSearch(options: OsmSearchOptions): Promise<RawLead[]> {
     throw new Error('OpenStreetMap search needs a location — pass --city, --region, or --country.');
   }
   const where = locationText(options.location);
-  const box = await geocode(where, options.proxies);
-  if (!box) throw new Error(`Could not locate "${where}" on OpenStreetMap.`);
-  const [south, north, west, east] = box;
+  const geo = await geocode(where, options.proxies);
+  if (!geo) throw new Error(`Could not locate "${where}" on OpenStreetMap.`);
+  let { south, north, west, east } = geo;
+  // A radius around the located point overrides the administrative bounding box.
+  if (options.distanceKm && Number.isFinite(geo.lat) && Number.isFinite(geo.lon)) {
+    const dLat = options.distanceKm / 111;
+    const dLon = options.distanceKm / (111 * Math.max(0.1, Math.cos((geo.lat * Math.PI) / 180)));
+    south = geo.lat - dLat;
+    north = geo.lat + dLat;
+    west = geo.lon - dLon;
+    east = geo.lon + dLon;
+  }
   const bbox = `${south},${west},${north},${east}`;
 
   const filters = filtersFor(options.term, options.category);

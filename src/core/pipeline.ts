@@ -51,6 +51,7 @@ export interface PipelineOptions {
   location: Location;
   limit: number;
   category?: string;
+  distanceKm?: number;
   key?: string;
   language?: string;
   enrichOwner: boolean;
@@ -125,6 +126,7 @@ async function search(opts: PipelineOptions): Promise<RawLead[]> {
     location: opts.location,
     limit: opts.limit,
     ...(opts.category ? { category: opts.category } : {}),
+    ...(opts.distanceKm ? { distanceKm: opts.distanceKm } : {}),
     ...(opts.proxies ? { proxies: opts.proxies } : {}),
   });
 }

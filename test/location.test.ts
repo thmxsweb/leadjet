@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countryCode, locationText, placesQuery } from '../src/core/location';
+import { countryCode, locationText, parseDistance, placesQuery } from '../src/core/location';
 
 describe('countryCode', () => {
   it('maps common names to ISO codes', () => {
@@ -29,5 +29,19 @@ describe('locationText / placesQuery', () => {
   });
   it('returns the bare term with no location', () => {
     expect(placesQuery('restaurants', {})).toBe('restaurants');
+  });
+});
+
+describe('parseDistance', () => {
+  it('parses km and m', () => {
+    expect(parseDistance('5km')).toBe(5);
+    expect(parseDistance('10 km')).toBe(10);
+    expect(parseDistance('800m')).toBe(0.8);
+    expect(parseDistance('12')).toBe(12);
+  });
+  it('rejects invalid or empty input', () => {
+    expect(parseDistance(undefined)).toBeUndefined();
+    expect(parseDistance('soon')).toBeUndefined();
+    expect(parseDistance('0km')).toBeUndefined();
   });
 });

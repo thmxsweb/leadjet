@@ -4,7 +4,7 @@ import { DEFAULT_WEB_URL, pushLeads } from '../core/cli-link.js';
 import { loadConfig, type Config, type ExportFormat } from '../core/config.js';
 import { mergeLeads, parseDataset, type DatasetFormat } from '../core/dataset.js';
 import { serialize } from '../core/export.js';
-import { type Location } from '../core/location.js';
+import { parseDistance, type Location } from '../core/location.js';
 import { runPipeline, type EnrichedLead } from '../core/pipeline.js';
 import { parseProxyList, ProxyRotator } from '../core/proxy.js';
 import { log } from '../util/logger.js';
@@ -14,6 +14,7 @@ interface LeadsOptions {
   country?: string;
   region?: string;
   city?: string;
+  distance?: string;
   category?: string;
   limit: string;
   owner: boolean;
@@ -69,6 +70,7 @@ export function registerLeadsCommand(program: Command): void {
     .option('--country <name>', 'target country, e.g. France, CA')
     .option('--region <name>', 'target region, e.g. Île-de-France, Quebec')
     .option('--city <name>', 'target city, e.g. Paris, Lyon')
+    .option('--distance <d>', 'radius around the city, e.g. 5km, 10km, 800m')
     .option('--category <cat>', 'OSM category: any|shops|food|craft|services|beauty')
     .option('-l, --limit <n>', 'maximum number of leads', '30')
     .option('--no-owner', 'skip owner lookup (French registry)')
@@ -84,8 +86,9 @@ export function registerLeadsCommand(program: Command): void {
     .addHelpText(
       'after',
       '\nExamples:\n' +
-        '  $ leadjet leads "restaurants" --city Lyon --country France -o leads.csv\n' +
-        '  $ leadjet leads "plombiers" --city Paris --region "Île-de-France" --no-audit\n',
+        '  $ leadjet leads "restaurants" --city Lyon --distance 10km --push\n' +
+        '  $ leadjet leads "plombiers" --region "Île-de-France" -o leads.csv\n' +
+        '  $ leadjet leads "boulangeries" --country France --no-audit\n',
     )
     .action(async (queryParts: string[], options: LeadsOptions) => {
       const config = loadConfig();
@@ -109,6 +112,17 @@ export function registerLeadsCommand(program: Command): void {
       const term = queryParts.join(' ');
       const limit = clampLimit(options.limit);
       const location = resolveLocation(options, config);
+      const distanceKm = parseDistance(options.distance);
+      if (options.distance && distanceKm === undefined) {
+        log.error(`Invalid --distance "${options.distance}". Use e.g. 5km, 10km, 800m.`);
+        process.exitCode = 1;
+        return;
+      }
+      if (distanceKm !== undefined && !location.city) {
+        log.error('--distance needs a --city to measure the radius from.');
+        process.exitCode = 1;
+        return;
+      }
       const key = options.key ?? config.placesKey;
       const source = (options.source ?? config.source ?? (key ? 'places' : 'osm')).toLowerCase();
       if (source !== 'places' && source !== 'osm') {
@@ -126,9 +140,14 @@ export function registerLeadsCommand(program: Command): void {
       const proxies = proxyUrls.length ? new ProxyRotator(proxyUrls) : undefined;
       const language = options.language ?? config.language;
 
-      log.info(
-        `Finding ${log.bold(term)}${location.city ? ` in ${log.bold(location.city)}` : ''} …`,
-      );
+      const scope = location.city
+        ? `${distanceKm !== undefined ? `within ${options.distance} of ` : 'in '}${log.bold(location.city)}`
+        : location.region
+          ? `in ${log.bold(location.region)}`
+          : location.country
+            ? `across ${log.bold(location.country)}`
+            : 'everywhere';
+      log.info(`Finding ${log.bold(term)} ${scope} …`);
       try {
         const leads = await runPipeline({
           source,
@@ -137,6 +156,7 @@ export function registerLeadsCommand(program: Command): void {
           limit,
           enrichOwner: options.owner,
           auditSites: options.audit,
+          ...(distanceKm !== undefined ? { distanceKm } : {}),
           ...(options.category ? { category: options.category } : {}),
           ...(source === 'places' && key ? { key } : {}),
           ...(language ? { language } : {}),

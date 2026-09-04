@@ -10,7 +10,7 @@ import {
   resolveFields,
   type FieldDef,
 } from '../core/fields.js';
-import { countryCode, placesQuery, type Location } from '../core/location.js';
+import { countryCode, parseDistance, placesQuery, type Location } from '../core/location.js';
 import { osmSearch } from '../core/osm.js';
 import { placeToRaw, PlacesError, searchText } from '../core/places.js';
 import { parseProxyList, ProxyRotator } from '../core/proxy.js';
@@ -27,6 +27,7 @@ interface FindOptions {
   country?: string;
   region?: string;
   city?: string;
+  distance?: string;
   category?: string;
   language?: string;
   key?: string;
@@ -49,6 +50,7 @@ export function registerFindCommand(program: Command): void {
     .option('--country <name|code>', 'target country, e.g. Canada, CA, France')
     .option('--region <name>', 'target region/state/province, e.g. Quebec, Île-de-France')
     .option('--city <name>', 'target city, e.g. Montreal, Paris')
+    .option('--distance <d>', 'radius around the city (OSM), e.g. 5km, 10km, 800m')
     .option('--category <cat>', 'OSM category: any|shops|food|craft|services|beauty')
     .option('--language <code>', 'language code, e.g. fr, en')
     .option('--key <key>', 'Google Places API key (overrides the saved one)')
@@ -99,6 +101,17 @@ export function registerFindCommand(program: Command): void {
       const limit = clampLimit(options.limit);
       const language = options.language ?? config.language;
       const location = resolveLocation(options, config);
+      const distanceKm = parseDistance(options.distance);
+      if (options.distance && distanceKm === undefined) {
+        log.error(`Invalid --distance "${options.distance}". Use e.g. 5km, 10km, 800m.`);
+        process.exitCode = 1;
+        return;
+      }
+      if (distanceKm !== undefined && !location.city) {
+        log.error('--distance needs a --city to measure the radius from.');
+        process.exitCode = 1;
+        return;
+      }
 
       const key = options.key ?? config.placesKey;
       const source = (options.source ?? config.source ?? (key ? 'places' : 'osm')).toLowerCase();
@@ -148,6 +161,7 @@ export function registerFindCommand(program: Command): void {
             term,
             location,
             limit,
+            ...(distanceKm !== undefined ? { distanceKm } : {}),
             ...(options.category ? { category: options.category } : {}),
             ...(proxies ? { proxies } : {}),
           });

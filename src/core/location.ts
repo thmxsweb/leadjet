@@ -5,6 +5,16 @@ export interface Location {
   city?: string;
 }
 
+/** Parse a distance like "5km", "10 km", "800m" into kilometres. */
+export function parseDistance(value?: string): number | undefined {
+  if (!value) return undefined;
+  const m = value.trim().match(/^([\d.]+)\s*(km|m)?$/i);
+  if (!m) return undefined;
+  let km = parseFloat(m[1]!);
+  if ((m[2] ?? '').toLowerCase() === 'm') km /= 1000;
+  return Number.isFinite(km) && km > 0 ? km : undefined;
+}
+
 /** Common country names → ISO 3166-1 alpha-2 codes (extend as needed). */
 const COUNTRY_CODES: Record<string, string> = {
   canada: 'CA',
