@@ -154,28 +154,56 @@ export async function osmSearch(options: OsmSearchOptions): Promise<RawLead[]> {
     west = geo.lon - dLon;
     east = geo.lon + dLon;
   }
-  const bbox = `${south},${west},${north},${east}`;
-
   const filters = filtersFor(options.term, options.category);
-  const clauses = filters.map((f) => `node[${f}](${bbox});way[${f}](${bbox});`).join('');
-  const ql = `[out:json][timeout:25];(${clauses});out center tags ${Math.min(options.limit * 2, 120)};`;
+  const clause = (bb: string): string =>
+    filters.map((f) => `node[${f}](${bb});way[${f}](${bb});`).join('');
 
-  const res = await overpass(ql, options.proxies);
-
-  const data = (await res.json()) as {
-    elements?: Array<{
-      type?: string;
-      id?: number;
-      tags?: Record<string, string>;
-      lat?: number;
-      lon?: number;
-      center?: { lat: number; lon: number };
-    }>;
-  };
+  // Large areas (a whole region/country) overwhelm a single Overpass query and
+  // time out — so tile them into cells and sweep from the center outward,
+  // stopping once we have enough. Small areas (a city / radius) stay one query.
+  const cells = tileCells(south, north, west, east, geo.lat, geo.lon);
 
   const seen = new Set<string>();
   const leads: RawLead[] = [];
-  for (const el of data.elements ?? []) {
+  let okCells = 0;
+  let lastErr: unknown;
+
+  for (let i = 0; i < cells.length && leads.length < options.limit; i++) {
+    const perCell = Math.min(Math.max((options.limit - leads.length) * 2, 30), 200);
+    const ql = `[out:json][timeout:30];(${clause(cells[i]!)});out center tags ${perCell};`;
+    try {
+      const res = await overpass(ql, options.proxies);
+      const data = (await res.json()) as { elements?: OverpassEl[] };
+      collect(data.elements ?? [], leads, seen, options.limit);
+      okCells += 1;
+    } catch (err) {
+      lastErr = err; // skip a failed cell and keep sweeping
+    }
+    if (cells.length > 1 && i < cells.length - 1 && leads.length < options.limit) {
+      await new Promise((r) => setTimeout(r, 350));
+    }
+  }
+  // If every attempt failed, surface the error rather than pretending "0 leads".
+  if (okCells === 0 && lastErr) {
+    throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+  }
+  // Website-less businesses first (best "needs a website" opportunities).
+  return leads.sort((a, b) => Number(Boolean(a.website)) - Number(Boolean(b.website)));
+}
+
+interface OverpassEl {
+  type?: string;
+  id?: number;
+  tags?: Record<string, string>;
+  lat?: number;
+  lon?: number;
+  center?: { lat: number; lon: number };
+}
+
+/** Append deduped businesses from Overpass elements, up to the limit. */
+function collect(elements: OverpassEl[], leads: RawLead[], seen: Set<string>, limit: number): void {
+  for (const el of elements) {
+    if (leads.length >= limit) break;
     const tags = el.tags ?? {};
     const name = tags.name;
     if (!name || seen.has(name.toLowerCase())) continue;
@@ -205,8 +233,50 @@ export async function osmSearch(options: OsmSearchOptions): Promise<RawLead[]> {
       place_id: `osm:${osmId}`,
       source: 'osm',
     });
-    if (leads.length >= options.limit) break;
   }
-  // Website-less businesses first (best "needs a website" opportunities).
-  return leads.sort((a, b) => Number(Boolean(a.website)) - Number(Boolean(b.website)));
+}
+
+/**
+ * Split a bounding box into Overpass-friendly cells, ordered nearest-first to
+ * (clat, clon) so dense central areas are swept before the sparse edges.
+ * Returns a single cell for small areas (one query, original behavior).
+ */
+function tileCells(
+  s: number,
+  n: number,
+  w: number,
+  e: number,
+  clat: number,
+  clon: number,
+): string[] {
+  const width = Math.abs(e - w);
+  const height = Math.abs(n - s);
+  const MAX_CELLS = 48;
+  let cell = 0.22; // ~24 km; comfortably handled by one Overpass query
+  let cols = Math.max(1, Math.ceil(width / cell));
+  let rows = Math.max(1, Math.ceil(height / cell));
+  if (cols * rows > MAX_CELLS) {
+    cell *= Math.sqrt((cols * rows) / MAX_CELLS);
+    cols = Math.max(1, Math.ceil(width / cell));
+    rows = Math.max(1, Math.ceil(height / cell));
+  }
+  if (cols * rows <= 1) return [`${s},${w},${n},${e}`];
+
+  const cw = width / cols;
+  const ch = height / rows;
+  const cells: { bb: string; d: number }[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cs = s + r * ch;
+      const cn = s + (r + 1) * ch;
+      const cwst = w + c * cw;
+      const ce = w + (c + 1) * cw;
+      const mlat = (cs + cn) / 2;
+      const mlon = (cwst + ce) / 2;
+      const d = (mlat - clat) ** 2 + (mlon - clon) ** 2;
+      cells.push({ bb: `${cs},${cwst},${cn},${ce}`, d });
+    }
+  }
+  cells.sort((a, b) => a.d - b.d);
+  return cells.map((x) => x.bb);
 }

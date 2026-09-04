@@ -27,6 +27,7 @@ export interface EnrichedLead {
   location: string;
   regCity: string;
   regCp: string;
+  regAddress: string;
   siteStatus: string;
   naf: string;
   legalForm: string;
@@ -215,6 +216,7 @@ async function enrichOne(raw: RawLead, opts: PipelineOptions): Promise<EnrichedL
     location,
     regCity: owner.regCity,
     regCp: owner.regCp,
+    regAddress: owner.regAddress,
     siteStatus: sc.siteStatus,
     naf: owner.naf,
     legalForm: owner.legalForm,
