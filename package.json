@@ -1,6 +1,6 @@
 {
   "name": "@thmxsweb/leadjet",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Find business leads from Google Places and export exactly the fields you want (JSON, CSV, NDJSON). Ships as an npm CLI and standalone binaries.",
   "keywords": [
     "leads",

@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Version tag (e.g. v0.1.0)'
+        description: 'Version tag (e.g. v0.3.1)'
         required: true
 
 permissions:
@@ -14,11 +14,12 @@ permissions:
   id-token: write
 
 jobs:
-  release:
-    name: Build binaries, installer, publish
+  build:
+    name: Binaries, Windows + Linux installers, npm
     runs-on: ubuntu-latest
     env:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -33,23 +34,47 @@ jobs:
         run: pnpm run check
 
       - name: Build standalone binaries (win/macOS/linux)
-        continue-on-error: true
         run: pnpm run build:binaries
 
-      - name: Build Windows installer (Program Files x86 + PATH)
+      - name: Windows installer (NSIS -> Program Files + PATH)
         continue-on-error: true
         run: |
           sudo apt-get update && sudo apt-get install -y nsis
-          # EnVar plugin for clean PATH edits.
           curl -fsSL -o /tmp/envar.zip https://nsis.sourceforge.io/mediawiki/images/7/7f/EnVar_plugin.zip
           sudo unzip -o /tmp/envar.zip -d /usr/share/nsis
-          makensis -DVERSION=${GITHUB_REF_NAME#v} installer/leadjet.nsi
+          makensis -DVERSION=${TAG#v} installer/leadjet.nsi
 
-      - name: Create GitHub Release
+      - name: Linux installers (.deb + .rpm via fpm)
+        continue-on-error: true
+        run: |
+          sudo apt-get update && sudo apt-get install -y ruby ruby-dev rpm build-essential
+          sudo gem install --no-document fpm
+          VER=${TAG#v}
+          chmod +x release/leadjet-linux
+          mkdir -p pkgroot/usr/bin
+          cp release/leadjet-linux pkgroot/usr/bin/leadjet
+          fpm -s dir -t deb -n leadjet -v "$VER" -a amd64 \
+            --description "Find, enrich and score local business leads." \
+            --maintainer "thmxsweb <322552692+thmxsweb@users.noreply.github.com>" \
+            --license MIT --url "https://github.com/thmxsweb/leadjet" \
+            -C pkgroot -p release/leadjet-linux.deb usr/bin/leadjet
+          fpm -s dir -t rpm -n leadjet -v "$VER" -a x86_64 \
+            --description "Find, enrich and score local business leads." \
+            --maintainer "thmxsweb" --license MIT --url "https://github.com/thmxsweb/leadjet" \
+            -C pkgroot -p release/leadjet-linux.rpm usr/bin/leadjet
+          ls -la release
+
+      - name: Share macOS binary with the pkg job
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-bin
+          path: release/leadjet-macos
+
+      - name: Create/Update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          name: ${{ github.event.inputs.tag || github.ref_name }}
+          tag_name: ${{ env.TAG }}
+          name: ${{ env.TAG }}
           generate_release_notes: true
           fail_on_unmatched_files: false
           files: |
@@ -57,9 +82,37 @@ jobs:
             release/leadjet-macos
             release/leadjet-linux
             release/leadjet-setup.exe
+            release/leadjet-linux.deb
+            release/leadjet-linux.rpm
 
       - name: Publish to npm (if token configured)
         if: ${{ env.NPM_TOKEN != '' }}
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  macos-installer:
+    name: macOS installer (.pkg)
+    needs: build
+    runs-on: macos-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: macos-bin
+          path: release
+      - name: Build .pkg (installs to /usr/local/bin/leadjet)
+        run: |
+          VER=${TAG#v}
+          mkdir -p pkgroot/usr/local/bin
+          cp release/leadjet-macos pkgroot/usr/local/bin/leadjet
+          chmod +x pkgroot/usr/local/bin/leadjet
+          pkgbuild --identifier co.thmxsweb.leadjet --version "$VER" \
+            --root pkgroot --install-location / release/leadjet-macos.pkg
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          fail_on_unmatched_files: false
+          files: release/leadjet-macos.pkg
