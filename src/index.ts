@@ -5,6 +5,7 @@ import { registerFieldsCommand } from './commands/fields-cmd.js';
 import { registerFindCommand } from './commands/find-cmd.js';
 import { registerLeadsCommand } from './commands/leads-cmd.js';
 import { registerLinkCommand } from './commands/link-cmd.js';
+import { registerMcpCommand } from './commands/mcp-cmd.js';
 import { registerStatusCommand } from './commands/status-cmd.js';
 import { VERSION } from './version.js';
 
@@ -27,6 +28,7 @@ program
 
 registerLinkCommand(program);
 registerStatusCommand(program);
+registerMcpCommand(program);
 registerLeadsCommand(program);
 registerFindCommand(program);
 registerContactsCommand(program);
